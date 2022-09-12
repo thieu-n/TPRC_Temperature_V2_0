@@ -261,7 +261,7 @@ void loop()
     if (!manualMode || programStarted) // if running automatic, or program is still running
     {
       runProgram();
-      //repeatrun(5);    // uncomment/remove this to run some custom programming variant
+      repeatrun(5);    // uncomment/remove this to run some custom programming variant
     }
     else
     {
@@ -641,7 +641,7 @@ void readButtons()
   {
     encButReleased = 1;
   }
-  if ((!digitalRead(PISTON_DOWN) || !digitalRead(SECOND_PISTON_DOWN)) && !programStarted && !motorStarted) // if any of the two piston buttons has been pressed, but the program/motor has not started
+  if ((!digitalRead(PISTON_DOWN) || !digitalRead(SECOND_PISTON_DOWN)) && !programStarted && !stepper1.moving()) // if any of the two piston buttons has been pressed, but the program/motor has not started
   {
     if ((millis() - pistButPressed > 200) && pistButReleased)
     {
@@ -963,6 +963,7 @@ void runProgram()
     programStarted = 0;   // program has stopped
     selectMode = 0;
     stepper1.stop();
+    motorStarted =
     setTemps(selectVal[0], 0); // re-set cooler temps, else the temps will stay at the hot temps. This may not be an advantage
     // Serial.println("Program Manualy stopped");
   }
