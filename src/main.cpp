@@ -781,24 +781,42 @@ void homeStepper(bool message)
   lcd1.print("To stop homing,");
   lcd1.setCursor(3, 3);
   lcd1.print("press S, C or P");
-  if (digitalRead(STEPPERHOMEPIN))
+
+  unsigned long lastHomePress = millis(); 
+  bool homeButtonPressed = 0;     
+
+  while(millis() - lastHomePress < 50 && homeButtonPressed == 0)    // first, check for 50ms that the switch is not pressed
   {
-    // digitalWrite(ENA, LOW);
+    if(digitalRead(STEPPERHOMEPIN)){    //if the home switch is not pressed
+        homeButtonPressed = 1;          //say that the system should home
+    } 
+  }
+
+  // digitalWrite(ENA, LOW);
+  if(homeButtonPressed){    // if the stepper should be homed (during the 50ms the swith showed it was not home), turn the stepper on
     stepper1.setSpeed(2000); // = U/Min
     stepper1.rotate(1);
   }
-  while (digitalRead(STEPPERHOMEPIN) && digitalRead(START_PROGRAM) && digitalRead(MANUAL_COOLDOWN) && digitalRead(PISTON_DOWN))
+
+  while (homeButtonPressed && digitalRead(START_PROGRAM) && digitalRead(MANUAL_COOLDOWN) && digitalRead(PISTON_DOWN))
   {
+    if(!digitalRead(STEPPERHOMEPIN)){    //if the home switch is pressed
+      if(millis() - lastHomePress > 50){ // if the home switch is pressed for 50ms (this is done because there was interference from statics)
+        homeButtonPressed = 0;
+      }
+    } else {                              // if the home switch is  not pressed, re-set the last time it was seen pressed
+      lastHomePress = millis();
+    }
   }
   if (message)
   {
     Serial.println("Stepper homed");
   }
   stepper1.rotate(0);
-  while(stepper1.moving()){
+  while(stepper1.moving()){   //wait for the stepper to wind down
   }
-  digitalWrite(ENA, HIGH);
-  stepper1.setZero();
+  digitalWrite(ENA, HIGH);    //TODO, can this be removed?
+  stepper1.setZero();         // zero the starting point of the stepper
 }
 
 void setTemps(int polNum, bool manual)
