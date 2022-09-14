@@ -37,10 +37,13 @@ void repeatrun(int nRuns);                                 // custom program for
 /*        Todo
     re-implement temperature curves
     implement different FF for moving
+    during movement between sequential welds, make the program not block
+    Add something to make backwards and forwards movement easyer (maybe an external switch)
 */
 
 // ------------------------------------- Ajustable values ---------------------------------
-#define N_POLY 6                                                                   // amount of polymers
+int noRuns = 1;       // Amount of welds the setup should preform sequentialy. This should only be done for spot-welds (set movement to 0 via control panel). Set to 0 or 1 for no repeats
+#define N_POLY 6                                                                   // amount of polymers, needs to be ajusted when "polymers" string is ajusted
 const String polymers[N_POLY] = {"LMPAEK", "LMLine", "PEKK  ", "PEEK  ", "PEI   ", "PPS   "}; // (initial) temperature setpoints in degrees celsius (hot top, hot bot, cooler top, cooler bottom)
 float polTemps[N_POLY][4] = {{380, 380, 200, 200},                            // Th1 Th2 Tc1 Tc2
                                   {400, 400, 200, 200},
@@ -157,6 +160,7 @@ bool wasOvertemp = 1;            // bool to see if overtemp state has changed
 bool manualCoolOn = 0;
 bool coolButReleased = 0;
 unsigned long coolButPressed = 0;
+bool progStopped  =0;           // flag that indicates the "runmultiple" that the run has been stopped, so it does not finish its other run after one is stopped
 
 bool motorStarted = 0;
 bool programStarted = 0; // flag that actualy determines whether program is started/still running
@@ -261,7 +265,7 @@ void loop()
     if (!manualMode || programStarted) // if running automatic, or program is still running
     {
       runProgram();
-      repeatrun(5);    // uncomment/remove this to run some custom programming variant
+      repeatrun(noRuns);    // uncomment/remove this to run some custom programming variant
     }
     else
     {
@@ -612,14 +616,11 @@ void readButtons()
     stepper1.stop();
     encChangeAllowed = 1; // enable changing the values via encoder
     programStarted = 0;   // program has stopped
+    programMode = 0;      // set to default, where nothing will happen
 
     for (int i = 0; i < 2; i++)
     {
       digitalWrite(PN[i], 0); // when changing, turn off cooler pneumatics
-    }
-    for (int i = 0; i < 4; i++)
-    {
-      digitalWrite(PWMOUT[i], LOW); // also turn off all heaters
     }
     setTemps(selectVal[0], manualMode);
   }
@@ -963,8 +964,9 @@ void runProgram()
     programStarted = 0;   // program has stopped
     selectMode = 0;
     stepper1.stop();
-    motorStarted =
+    motorStarted = 0;
     setTemps(selectVal[0], 0); // re-set cooler temps, else the temps will stay at the hot temps. This may not be an advantage
+    noRuns = 0;       // Set the amount of repeat runs to 0, else if there were any left in memory, it would do them now
     // Serial.println("Program Manualy stopped");
   }
 
