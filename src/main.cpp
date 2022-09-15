@@ -31,7 +31,7 @@ void thermocoupleInitialise(bool printSerial);    // initialise and check all th
 void encButSwitch();                              // do everything with the encoder button selection
 void runProgram();                                // called to run the automatic program
 int runAverage(int n, int val);                   // Run average, in function because in array would not work :(
-void repeatrun(int nRuns);                                 // custom program for doing multipe tests on one sample
+void repeatrun();                                 // custom program for doing multipe tests on one sample
 
 
 /*        Todo
@@ -45,7 +45,7 @@ void repeatrun(int nRuns);                                 // custom program for
 int noRuns = 1;       // Amount of welds the setup should preform sequentialy. This should only be done for spot-welds (set movement to 0 via control panel). Set to 0 or 1 for no repeats
 #define N_POLY 6                                                                   // amount of polymers, needs to be ajusted when "polymers" string is ajusted
 const String polymers[N_POLY] = {"LMPAEK", "LMLine", "PEKK  ", "PEEK  ", "PEI   ", "PPS   "}; // (initial) temperature setpoints in degrees celsius (hot top, hot bot, cooler top, cooler bottom)
-float polTemps[N_POLY][4] = {{380, 380, 200, 200},                            // Th1 Th2 Tc1 Tc2
+float polTemps[N_POLY][4] =     {{370, 370, 200, 200},                            // Th1 Th2 Tc1 Tc2
                                   {400, 400, 200, 200},
                                    {395, 395, 250, 250},
                                    {375, 375, 250, 250},
@@ -109,8 +109,8 @@ const int PWMOUT[4] = {8, 9, 10, 11};                        // all PWM-pins, sh
 const String offOn[2] = {"OFF", " ON"};
 const String upDown[2] = {"  UP", "DOWN"};
 const String stopStart[2] = {" STOP", "START"};
-const String prgmMove[2] = {" prgm:", " move:"}; // display eighter "prgm: " or "move:"
-const String prgStep[6] = {" STOP", "PRE-H", " HEAT", " HOLD", " MOVE", " COOL"};
+const String prgmMove[2] = {" Prgm:", " Move:"}; // display eighter "prgm: " or "move:"
+const String prgStep[6] = {" STOP", "PRE-H", " HEAT", " HOLD", " MOVE", " COOL"}; // all the phases of the welding process
 // -----------------------------  Declarations and initialisations -------------------------------
 
 double temp[10]; // array for the temperatures
@@ -174,6 +174,7 @@ int setPWM = 0;               // PWM values for feedforward test
 
 bool startRepeat = 0; // flag to check whether to start the repeating program, will only start if called upon and program is started
 int amountRepeat = 0; // amount of repeat runs that have been run
+int amountToMove = 0; // amount of distance between each sequential weld, gets calculated at the start of the sequential welds to cover the whole stage range
 
 LiquidCrystal_I2C lcd1(0x27, 20, 4); // set the LCD address to 0x27
 LiquidCrystal_I2C lcd2(0x26, 20, 4); // set the LCD address to 0x26
@@ -265,7 +266,7 @@ void loop()
     if (!manualMode || programStarted) // if running automatic, or program is still running
     {
       runProgram();
-      repeatrun(noRuns);    // uncomment/remove this to run some custom programming variant
+      repeatrun();    // uncomment/remove this to run some custom programming variant
     }
     else
     {
@@ -452,8 +453,8 @@ void dispTemp() // int selectMode = 0; // polymer, weldTime, weldLength, weldSpd
   s03 += selString[0] + " Heat: " + offOn[heatEnable];
   lcd1.setCursor(0, 3);
   lcd1.print(s03);
-
-  String s10 = "    ";
+  // cursor 2 temperatures
+  String s10 = "R:" + n2s(noRuns,1) + " "; 
   s10 += n2s(temp[6], 3) + " " + n2s(temp[7], 3) + " " + n2s(temp[8], 3) + " " + n2s(temp[9], 3);
   lcd2.setCursor(0, 0);
   lcd2.print(s10);
@@ -524,7 +525,7 @@ void logTempCSV(int plot, bool logPID)
   Serial.println();
 }
 
-void runMotor()
+void runMotor() // program for running the motor in "manual" mode
 {
   if (!motorStarted)
   { // if the motor has not yet started
@@ -687,6 +688,8 @@ void readButtons()
     startButReleased = 1;
   }
 }
+
+
 
 void setPointTemp()
 {
@@ -1074,25 +1077,25 @@ int runAverage(int n, int val)
   return avg;
 }
 
-void repeatrun(int nRuns){
+void repeatrun(){ 
   // Code to run multiple welding tests sequentialy
   
   if(startProgram && ! startRepeat){
     startRepeat = 1;    // only start repeating after a program has started and finished
+    amountToMove = (STAGE_LENGTH)/(noRuns - 1); // distance to move in mm, total movement / (amount of tests - 1)
   }
 
-  if(!startProgram && startRepeat && amountRepeat + 1 < nRuns){ // if the other program has finished and the amount of repeats is lower then the wanted amount
+  if(!startProgram && startRepeat && noRuns > 1){ // if the other program has finished and the amount of repeats is lower then the wanted amount
     startProgram = 1;   // start a new program
-    amountRepeat += 1;  // nth test that is taken
-    int amountToMove = (STAGE_LENGTH)/(nRuns - 1); // distance to move in mm, total movement / (amount of tests - 1)
+    noRuns -= 1;  // nth test that is taken
     moveMotor(selectVal[3], amountToMove);
     while(stepper1.moving()){ // while stepper is moving, do nothing
-
+      delay(1);
     }
-    //polTemps[selectVal[0]][0] += 10;   // increase setpoint temperature with 10 deg
-    //polTemps[selectVal[0]][1] += 10;
-    // selectVal[1] += 10;
-    //setTemps(selectVal[0],0);         // set temperature from memory to setpoints
+    polTemps[selectVal[0]][0] += 10;   // increase setpoint temperature with 10 deg
+    polTemps[selectVal[0]][1] += 10;
+    setTemps(selectVal[0],0);         // set temperature from memory to setpoints
+    // selectVal[1] += 10;            // increase welding time by 10 seconds
   }
 
 
