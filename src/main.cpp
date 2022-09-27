@@ -5,7 +5,6 @@
 #include <Encoder.h>
 #include <MobaTools.h>
 #include <EEPROM.h>
-#include "testFunc.h"
 #include "Adafruit_MAX31855.h"
 #include <movingAvg.h>
 
